@@ -102,7 +102,6 @@ ccux regen --section hero,pricing
 | `ccux gen` | Generate landing page | `ccux gen --desc "SaaS platform"` |  
 | `ccux regen` | Regenerate sections | `ccux regen --section hero` |
 | `ccux projects` | List projects | `ccux projects` |
-| `ccux cost` | Show cost analysis | `ccux cost --detailed` |
 | `ccux help` | Get help | `ccux help themes` |
 | `ccux version` | Show version | `ccux version` |
 
