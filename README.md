@@ -1,6 +1,4 @@
 # CCUX — AI-Powered Website Generator
-
-Generate multi-page, conversion-optimized websites directly from your terminal.  
 CCUX uses **Claude AI** to transform a simple product description into production-ready code — no design tools required.
 
 ---
