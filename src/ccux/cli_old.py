@@ -1599,6 +1599,7 @@ def gen(
     theme: Optional[str] = typer.Option(None, "--theme", "-t", help=f"Design theme ({'/'.join(get_theme_choices())})"),
     no_design_thinking: bool = typer.Option(False, "--no-design-thinking", help="Skip design thinking process"),
     include_forms: bool = typer.Option(False, "--include-forms", help="Include contact forms in the landing page"),
+    analyze_images: bool = typer.Option(True, "--analyze-images/--no-analyze-images", help="Enable visual analysis of competitor screenshots (uses more tokens)"),
     output_dir: Optional[str] = typer.Option(None, "--output", "-o", help="Output directory")
 ):
     """Generate a conversion-optimized landing page
@@ -1643,15 +1644,16 @@ def gen(
         console.print("[bold blue]🎨 Interactive Mode - CCUX Generator[/bold blue]")
         console.print("Let's create your landing page step by step.\n")
         
-        # Get product description
-        desc = Prompt.ask(
-            "[bold]What product/service would you like to create a landing page for?[/bold]",
-            default="",
-            show_default=False
-        )
-        if not desc.strip():
-            console.print("[red]❌ Product description is required.[/red]")
-            raise typer.Exit(1)
+        # Get product description with validation loop
+        while True:
+            desc = Prompt.ask(
+                "[bold]What product/service would you like to create a landing page for?[/bold]",
+                default="",
+                show_default=False
+            )
+            if desc and desc.strip():
+                break
+            console.print("[red]❌ Product description is required. Please provide a description to continue.[/red]")
         
         # Optional URLs
         if not urls:
@@ -1705,6 +1707,12 @@ def gen(
         console.print(f"Framework: [cyan]{framework}[/cyan] | Theme: [cyan]{theme}[/cyan]")
         console.print(f"Design thinking: [cyan]{'Yes' if not no_design_thinking else 'No'}[/cyan]\n")
     
+    # Additional validation - ensure desc is not empty even if passed as argument
+    if not desc or not desc.strip():
+        console.print("[red]❌ Product description is required. Cannot generate landing page without a product description.[/red]")
+        console.print("[dim]Use --desc 'Your product description' or run without arguments for interactive mode.[/dim]")
+        raise typer.Exit(1)
+    
     # Summarize description if too long
     if desc:
         desc = summarize_long_description(desc)
@@ -1735,20 +1743,10 @@ def gen(
     console.print(f"Framework: [green]{framework}[/green] | Theme: [green]{theme}[/green]")
     
     if no_design_thinking:
-        # Simple mode - direct generation
-        console.print("\n[bold yellow]⚡ Quick generation mode (no design thinking)[/bold yellow]")
+        # Simple mode - direct generation (no screenshots needed)
+        console.print("\n[bold yellow]⚡ Quick generation mode (no design thinking, no image analysis)[/bold yellow]")
         
-        screenshot_path = None
-        if urls and len(urls) > 0:
-            try:
-                # Use the first URL for simple mode
-                url = urls[0]
-                console.print(f"[bold blue]📸 Capturing reference screenshot from {url}...[/bold blue]")
-                _, screenshot_path = capture(url, output_dir)
-            except Exception as e:
-                console.print(f"[yellow]⚠️  Failed to capture screenshot: {e}[/yellow]")
-        
-        # Generate directly
+        # Generate directly without any screenshot capture
         prompt = landing_prompt(desc, framework, theme, sections, include_forms=include_forms)
         output, stats = run_claude_with_progress(prompt, "Generating landing page...")
         
@@ -1816,30 +1814,38 @@ def gen(
         console.print("\n[bold green]🧠 Running comprehensive design thinking process...[/bold green]")
         
         try:
-            # Phase 1: Reference Discovery
-            console.print("\n[bold]Phase 1: Reference Discovery[/bold]")
-            prompt = reference_discovery_prompt(desc)
-            refs_output, _ = run_claude_with_progress(prompt, "Discovering competitor references...")
-            
-            # Parse reference URLs
+            # Phase 1: Reference Discovery (only if image analysis is enabled)
             ref_urls = []
-            for line in refs_output.split('\n'):
-                if '–' in line and 'http' in line:
-                    try:
-                        url_part = line.split('–')[1].strip()
-                        if url_part.startswith('http'):
-                            ref_urls.append(url_part.split()[0])
-                    except:
-                        continue
-            
-            # Add user-provided URLs if available
-            if urls:
-                # Insert user URLs at the beginning, maintaining order
-                for i, user_url in enumerate(reversed(urls)):
-                    ref_urls.insert(0, user_url)
-            
-            # Limit to 3 references for performance
-            ref_urls = ref_urls[:3]
+            if analyze_images:
+                console.print("\n[bold]Phase 1: Reference Discovery[/bold]")
+                prompt = reference_discovery_prompt(desc)
+                refs_output, _ = run_claude_with_progress(prompt, "Discovering competitor references...")
+                
+                # Parse reference URLs
+                for line in refs_output.split('\n'):
+                    if '–' in line and 'http' in line:
+                        try:
+                            url_part = line.split('–')[1].strip()
+                            if url_part.startswith('http'):
+                                ref_urls.append(url_part.split()[0])
+                        except:
+                            continue
+                
+                # Add user-provided URLs if available
+                if urls:
+                    # Insert user URLs at the beginning, maintaining order
+                    for i, user_url in enumerate(reversed(urls)):
+                        ref_urls.insert(0, user_url)
+                
+                # Limit to 3 references for performance
+                ref_urls = ref_urls[:3]
+            else:
+                console.print("\n[bold]Phase 1: Reference Discovery (Skipped - Image Analysis Disabled)[/bold]")
+                console.print("ℹ️  Skipping reference discovery to save tokens")
+                
+                # Still add user-provided URLs if available, but limit them 
+                if urls:
+                    ref_urls = urls[:3]
             
             # 🔍 Debug / confirmation log
             if ref_urls:
@@ -1850,6 +1856,10 @@ def gen(
             
             if not ref_urls:
                 console.print("[yellow]⚠️  No reference URLs found. Continuing without screenshots.[/yellow]")
+                screenshot_refs = []
+            elif not analyze_images:
+                console.print(f"\n[bold]Phase 2: Screenshot Capture (Skipped - Image Analysis Disabled)[/bold]")
+                console.print("ℹ️  Skipping screenshot capture to save tokens")
                 screenshot_refs = []
             else:
                 # Phase 2: Screenshot Capture
@@ -1863,14 +1873,18 @@ def gen(
             product_output, _ = run_claude_with_progress(prompt, "Analyzing product positioning...")
             product_understanding = safe_json_parse(product_output)
             
-            # Phase 4: UX Research
+            # Phase 4: UX Research  
             ux_analysis = {}
-            if screenshot_refs:
-                console.print("\n[bold]Phase 4: UX Research[/bold]")
+            if screenshot_refs and analyze_images:
+                console.print("\n[bold]Phase 4: UX Research (Visual Analysis)[/bold]")
                 screenshot_paths = [screenshot_path for url, screenshot_path in screenshot_refs]
                 prompt = ux_analysis_prompt(desc, screenshot_paths)
-                ux_output, _ = run_claude_with_progress(prompt, "Analyzing competitor UX patterns...")
+                ux_output, _ = run_claude_with_progress(prompt, "Analyzing competitor UX patterns...", enable_image_analysis=True)
                 ux_analysis = safe_json_parse(ux_output)
+            elif screenshot_refs and not analyze_images:
+                console.print("\n[bold]Phase 4: UX Research (Skipped - Visual Analysis Disabled)[/bold]")
+                console.print("ℹ️  Screenshots captured but visual analysis disabled to save tokens")
+                console.print("   Use --analyze-images flag to enable competitor visual analysis")
             
             # Phase 5: Empathy & User Research
             console.print("\n[bold]Phase 5: User Empathy Mapping[/bold]")
@@ -2066,11 +2080,21 @@ def _regenerate_sections_internal(
                     pass
             
             if not desc:
-                desc = Prompt.ask(
-                    "[bold]What is this landing page for?[/bold]",
-                    default="Product landing page",
-                    show_default=False
-                )
+                while True:
+                    desc = Prompt.ask(
+                        "[bold]What is this landing page for?[/bold]",
+                        default="",
+                        show_default=False
+                    )
+                    if desc and desc.strip():
+                        break
+                    console.print("[red]❌ Product description is required to regenerate sections properly.[/red]")
+        
+        # Final validation to ensure we have a meaningful description
+        if not desc or not desc.strip() or desc.strip().lower() in ['landing page product', 'product landing page']:
+            console.print("[red]❌ A meaningful product description is required to regenerate sections properly.[/red]")
+            console.print("[dim]Please provide a specific description of what this landing page is for.[/dim]")
+            return False
         
         console.print(f"Regenerating sections: [bold]{', '.join(sections_to_regenerate)}[/bold]")
         

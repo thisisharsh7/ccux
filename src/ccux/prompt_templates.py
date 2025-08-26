@@ -141,35 +141,51 @@ IMPORTANT: You must respond with valid JSON only. No explanations, no markdown, 
 
 def ux_analysis_prompt(product_desc: str, refs: List[str]) -> str:
     refs_text = "\n".join(
-        f"- {screenshot_path.split('/')[-1]}" for screenshot_path in refs
+        f"- {screenshot_path}" for screenshot_path in refs
     )
 
+    image_count = len(refs)
     return f'''UX competitive analysis of: {product_desc}
 
-Read and analyze the following screenshots for UX patterns:
+I'm showing you {image_count} competitor website screenshot(s) below. Please analyze these images for UX patterns and design elements.
+
+Screenshots to analyze:
 {refs_text}
+
+Provide a detailed visual analysis of the screenshots, focusing on:
+- Navigation patterns and menu structures
+- Call-to-action placement and design
+- Layout and information hierarchy
+- Typography and visual messaging
+- Mobile responsiveness indicators
+- Conversion-focused elements
 
 Respond in JSON:
 {{
   "patterns": {{
-    "navigation": ["..."],
-    "ctas": ["..."],
-    "layouts": ["..."],
-    "messaging": ["..."]
+    "navigation": ["specific navigation patterns observed"],
+    "ctas": ["call-to-action styles and placements seen"],
+    "layouts": ["layout structures and grid systems used"],
+    "messaging": ["headline and copy patterns identified"]
   }},
-  "differentiators": [{{"screenshot":"...","element":"...","why":"..."}}],
+  "differentiators": [{{"screenshot":"reference_1_domain","element":"specific UI element","why":"what makes this unique or effective"}}],
   "weaknesses": {{
-    "common": ["..."],
-    "severe": ["..."]
+    "common": ["widespread UX issues seen across sites"],
+    "severe": ["major usability problems identified"]
   }},
   "recommendations": {{
-    "adopt": ["..."],
-    "avoid": ["..."],
-    "innovate": ["..."]
+    "adopt": ["effective patterns to implement"],
+    "avoid": ["problematic patterns to skip"],
+    "innovate": ["opportunities to do better than competitors"]
   }},
-  "summary": "1-2 sentence takeaway"
+  "summary": "1-2 sentence key takeaway from visual analysis"
 }}
-Rules: Be concise, specific, mobile-first.'''
+
+Rules: 
+- Base analysis ONLY on what you can see in the images
+- Be specific about visual elements and their placement
+- Focus on mobile-first design considerations
+- Identify conversion-optimization opportunities'''
 
 
 def empathize_prompt(product_desc: str, product_understanding: Dict, ux_analysis: Dict) -> str:

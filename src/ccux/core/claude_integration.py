@@ -7,7 +7,11 @@ Manages subprocess execution with timeout protection and usage tracking.
 
 import subprocess
 import threading
-from typing import Dict, Any, Tuple
+import base64
+import os
+import re
+import json
+from typing import Dict, Any, Tuple, List
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.console import Console
 
@@ -16,18 +20,121 @@ from .signal_handling import set_current_subprocess, set_current_progress, clear
 from .configuration import Config
 
 
-def run_claude_with_progress(prompt: str, description: str = "Claude Code is thinking...") -> Tuple[str, Dict[str, Any]]:
-    """Run Claude CLI with real-time progress indication and usage tracking via ccusage"""
+def extract_image_paths(prompt: str) -> List[str]:
+    """Extract image file paths from prompt text"""
+    # Look for common image file extensions in the prompt
+    image_extensions = r'\.(jpg|jpeg|png|gif|bmp|webp|tiff)'
+    # Find paths that end with image extensions
+    pattern = r'([^\s\n]+' + image_extensions + r')'
+    matches = re.findall(pattern, prompt, re.IGNORECASE)
+    return [match[0] for match in matches]
+
+
+def encode_image_to_base64(image_path: str) -> tuple[str, str]:
+    """Encode image file to base64 and determine media type"""
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+    
+    # Determine media type from extension
+    ext = os.path.splitext(image_path)[1].lower()
+    media_type_map = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg', 
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.bmp': 'image/bmp',
+        '.webp': 'image/webp',
+        '.tiff': 'image/tiff'
+    }
+    
+    media_type = media_type_map.get(ext, 'image/jpeg')
+    
+    with open(image_path, 'rb') as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+    
+    return encoded_string, media_type
+
+
+def create_message_with_images(prompt: str, image_paths: List[str]) -> dict:
+    """Create Claude API message format with images and text"""
+    content = []
+    
+    # Add images first
+    for image_path in image_paths:
+        try:
+            base64_data, media_type = encode_image_to_base64(image_path)
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64_data
+                }
+            })
+        except Exception as e:
+            # If image encoding fails, continue without this image
+            console = Console()
+            console.print(f"[yellow]⚠️  Failed to encode image {image_path}: {e}[/yellow]")
+            continue
+    
+    # Add text content (remove image paths from prompt since we're now including them as images)
+    text_prompt = prompt
+    for image_path in image_paths:
+        text_prompt = text_prompt.replace(f"- {image_path}", "")
+        text_prompt = text_prompt.replace(image_path, "")
+    
+    # Clean up any empty lines or duplicate newlines
+    text_prompt = re.sub(r'\n\s*\n', '\n', text_prompt.strip())
+    
+    content.append({
+        "type": "text", 
+        "text": text_prompt
+    })
+    
+    return {
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 4000,
+        "messages": [
+            {
+                "role": "user",
+                "content": content
+            }
+        ]
+    }
+
+
+def run_claude_api_with_images(prompt: str, image_paths: List[str], description: str, pre_usage: Dict[str, Any], claude_cmd: str) -> Tuple[str, Dict[str, Any]]:
+    """Run Claude with images by creating a prompt that uses the Read tool pattern"""
     console = Console()
-    config = Config()
-    claude_cmd = config.get_claude_command()
     
-    # Get usage before Claude call for comparison
-    pre_usage = get_latest_usage()
+    # Create a modified prompt that asks Claude to read the image files
+    read_commands = []
+    for i, image_path in enumerate(image_paths, 1):
+        if os.path.exists(image_path):
+            read_commands.append(f"Please read and analyze image {i}: {image_path}")
     
-    # Prepare Claude command
-    cmd = [claude_cmd, '--print', prompt]
+    if not read_commands:
+        console.print("[yellow]⚠️  No valid image files found, falling back to text-only analysis[/yellow]")
+        cmd = [claude_cmd, '--print', prompt]
+        return run_claude_cli_fallback(cmd, description, pre_usage)
     
+    # Create new prompt that asks Claude to read the images
+    image_analysis_prompt = f"""I need you to analyze competitor website screenshots for UX patterns.
+
+{' '.join(read_commands)}
+
+After reading these images, please provide: {prompt.split('Respond in JSON:')[1] if 'Respond in JSON:' in prompt else prompt}
+
+Focus your analysis on what you can actually see in the images - navigation, layouts, CTAs, typography, and overall design patterns."""
+    
+    # Use regular Claude CLI 
+    cmd = [claude_cmd, '--print', image_analysis_prompt]
+    return run_claude_cli_fallback(cmd, description, pre_usage)
+
+
+def run_claude_cli_fallback(cmd: List[str], description: str, pre_usage: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    """Fallback to regular CLI execution"""
+    console = Console()
     output_lines = []
     stderr_lines = []
     
@@ -51,7 +158,6 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
         task = progress.add_task("Processing", total=None)
         
         try:
-            # Start Claude process
             current_subprocess = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -90,7 +196,6 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
                 error_msg = '\n'.join(stderr_lines) if stderr_lines else "Claude Code execution failed"
                 raise Exception(f"Claude Code failed: {error_msg}")
             
-            # Clean up
             clear_current_subprocess()
             clear_current_progress()
             
@@ -106,6 +211,26 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
             clear_current_subprocess()
             clear_current_progress()
             raise e
+
+
+def run_claude_with_progress(prompt: str, description: str = "Claude Code is thinking...", enable_image_analysis: bool = False) -> Tuple[str, Dict[str, Any]]:
+    """Run Claude CLI with real-time progress indication and usage tracking via ccusage"""
+    config = Config()
+    claude_cmd = config.get_claude_command()
+    
+    # Get usage before Claude call for comparison
+    pre_usage = get_latest_usage()
+    
+    # Only check for image paths if image analysis is enabled
+    if enable_image_analysis:
+        image_paths = extract_image_paths(prompt)
+        if image_paths:
+            # Use Claude API directly with images
+            return run_claude_api_with_images(prompt, image_paths, description, pre_usage, claude_cmd)
+    
+    # Use regular Claude CLI (either no images found or image analysis disabled)
+    cmd = [claude_cmd, '--print', prompt]
+    return run_claude_cli_fallback(cmd, description, pre_usage)
 
 
 def summarize_long_description(desc: str) -> str:

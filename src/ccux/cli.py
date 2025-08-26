@@ -164,12 +164,13 @@ def gen(
     theme: Optional[str] = typer.Option("minimal", "--theme", "-t", help="Design theme"),
     no_design_thinking: bool = typer.Option(False, "--no-design-thinking", help="Skip full design thinking process"),
     include_forms: bool = typer.Option(False, "--include-forms", help="Include contact forms"),
+    analyze_images: bool = typer.Option(True, "--analyze-images/--no-analyze-images", help="Enable visual analysis of competitor screenshots (uses more tokens)"),
     output_dir: Optional[str] = typer.Option(None, "--output", "-o", help="Output directory")
 ):
     """Generate conversion-optimized landing page"""
     # Import and use the gen function from cli_old
     from . import cli_old
-    cli_old.gen(desc, desc_file, url, framework, theme, no_design_thinking, include_forms, output_dir)
+    cli_old.gen(desc, desc_file, url, framework, theme, no_design_thinking, include_forms, analyze_images, output_dir)
 
 @app.command()
 def regen(

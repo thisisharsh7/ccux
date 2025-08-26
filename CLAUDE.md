@@ -85,6 +85,7 @@ Launch CCUX Interactive Application (Main Entry Point)
 - Interactive theme switching with live preview
 - Form management (contact, newsletter, signup forms)
 - Built-in help system and workflows
+- Content editing with natural language instructions
 - **ESC Key Support**: Press ESC anywhere to immediately exit
 
 ### `ccux gen`
@@ -98,6 +99,7 @@ Generate conversion-optimized landing page using AI design methodology
 - `--theme, -t THEME`: Design theme (default: minimal)
 - `--no-design-thinking`: Skip full design process for faster generation
 - `--include-forms`: Include contact forms in the landing page
+- `--analyze-images/--no-analyze-images`: Enable/disable visual analysis of competitor screenshots (default: enabled, uses more tokens when enabled)
 - `--output, -o DIR`: Output directory
 
 **Examples:**
@@ -111,8 +113,14 @@ ccux gen --desc "AI project management tool" --theme brutalist
 # Fast generation mode
 ccux gen --desc "SaaS platform" --no-design-thinking
 
-# With competitor analysis
+# With competitor analysis (visual analysis enabled by default)
 ccux gen --desc "Video platform" --url https://loom.com --url https://vimeo.com
+
+# Load description from PDF file
+ccux gen --desc-file product-description.pdf --theme minimal
+
+# Save tokens by disabling image analysis
+ccux gen --desc "SaaS platform" --no-analyze-images
 
 # React output with forms
 ccux gen --desc "Landing page" --framework react --include-forms
@@ -149,93 +157,7 @@ ccux regen --all
 ccux regen --section pricing --file custom/page.html
 ```
 
-### `ccux editgen`
-Edit specific content in landing pages using natural language instructions
-
-**Usage:** `ccux editgen INSTRUCTION [OPTIONS]`
-
-**Options:**
-- `--desc, -d TEXT`: Product description (auto-detected if not provided)
-- `--file, -f FILE`: Path to landing page file
-- `--output, -o DIR`: Output directory
-- `--sections, -s TEXT`: Focus changes on specific sections (comma-separated)
-
-**Examples:**
-```bash
-# Basic content edits
-ccux editgen "Change hero headline to 'Revolutionary AI Platform'"
-ccux editgen "Update pricing to show monthly rates"
-
-# Section-focused edits  
-ccux editgen "Add real-time collaboration feature" --sections features
-ccux editgen "Update testimonials with enterprise quotes" --sections testimonials
-
-# Content additions
-ccux editgen "Add FAQ section about pricing model"
-ccux editgen "Replace hero image with product screenshot"
-```
-
-### `ccux theme`
-Change the visual theme of existing landing pages
-
-**Usage:** `ccux theme THEME [OPTIONS]`
-
-**Arguments:** `THEME` - New theme name (minimal|brutalist|playful|corporate|morphism|animated|terminal|aesthetic|dark|vibrant|sustainable|data|illustrated)
-
-**Options:**
-- `--file, -f FILE`: Path to landing page file  
-- `--output, -o DIR`: Output directory
-
-**Examples:**
-```bash
-# Change to brutalist theme
-ccux theme brutalist
-
-# Change theme for specific file
-ccux theme morphism --file portfolio.html
-
-# Interactive theme selection (leave theme empty)
-ccux theme
-```
-
-### `ccux form`
-Advanced form control with detailed customization
-
-**Usage:** `ccux form STATE [OPTIONS]`
-
-**Arguments:** `STATE` - Form action (on|off|edit)
-
-**Options:**
-- `--file, -f FILE`: Path to landing page file
-- `--output, -o DIR`: Output directory  
-- `--type, -t TYPE`: Form type (contact|newsletter|signup|custom)
-- `--fields FIELDS`: Comma-separated field list (name,email,phone,message,company,website,subject)
-- `--style, -s STYLE`: Form style (inline|modal|sidebar|fullpage)
-- `--cta TEXT`: Custom call-to-action button text
-
-**Form Types:**
-- `contact`: General contact form with name, email, message
-- `newsletter`: Simple email signup form
-- `signup`: Registration form with multiple user fields
-- `custom`: Custom field configuration
-
-**Form Styles:**
-- `inline`: Embedded directly in page sections
-- `modal`: Popup modal overlay with click trigger
-- `sidebar`: Fixed position sidebar form  
-- `fullpage`: Dedicated full-width form section
-
-**Examples:**
-```bash
-# Basic form control
-ccux form on                    # Add contact forms
-ccux form off                   # Remove all forms
-
-# Advanced customization  
-ccux form edit --type contact --fields name,email,message --cta "Get In Touch"
-ccux form edit --type newsletter --style inline --cta "Subscribe Now"
-ccux form edit --type signup --fields name,email,phone --style modal
-```
+**Note:** Advanced commands like `editgen`, `theme`, and `form` are available through the interactive application launched with `ccux init`. The interactive interface provides guided workflows for these advanced features with rich terminal UI and visual feedback.
 
 ### `ccux help`
 Comprehensive help system with specialized topics
@@ -386,14 +308,15 @@ output_dir: output/landing-page
 - **Rich** (≥13.7.0): Terminal formatting, progress bars, and UI components
 - **Playwright** (≥1.45.0): Web scraping and screenshot automation
 - **PyYAML** (≥6.0.1): Configuration file parsing
+- **PyPDF2** (≥3.0.0): PDF processing for description files
 
 ### File Structure
 ```
 src/ccux/
 ├── __init__.py              # Package initialization
 ├── __main__.py              # Entry point for python -m ccux
-├── cli.py                   # User-facing CLI with help system (356 lines)
-├── cli_old.py               # Implementation CLI with core commands (485 lines)
+├── cli.py                   # User-facing CLI with help system
+├── cli_old.py               # Implementation CLI with core commands
 ├── interactive.py           # Interactive application interface
 ├── core/                    # Modular utility system
 │   ├── __init__.py
@@ -417,10 +340,10 @@ src/ccux/
 
 The recent reorganization provides significant improvements:
 
-### 🧹 **Code Deduplication**
-- **Before**: 3,925 total lines with extensive duplication
-- **After**: 841 lines in CLI files (78% reduction!) + organized core modules
-- Each utility function exists in only one place
+### 🧹 **Code Deduplication**  
+- **78% Reduction**: Eliminated duplicate code through smart modularization
+- **Organized Core Modules**: Each utility function exists in only one place
+- **Clean Imports**: Clear dependency relationships between modules
 
 ### 📖 **Improved Readability**
 - `cli.py`: Clean user interface with comprehensive help system

@@ -287,10 +287,19 @@ class InteractiveForm:
                 console.print(f"[bold]{field.label}[/bold]")
                 
                 if field.field_type == "text":
-                    if field.multiline:
-                        value = prompt_with_esc_support(f"{field.placeholder}", "")
-                    else:
-                        value = prompt_with_esc_support(f"{field.placeholder}", "")
+                    while True:
+                        if field.multiline:
+                            value = prompt_with_esc_support(f"{field.placeholder}", "")
+                        else:
+                            value = prompt_with_esc_support(f"{field.placeholder}", "")
+                        
+                        # Check if field is required and validate
+                        if field.required and (not value or not value.strip()):
+                            console.print(f"[red]❌ {field.label} is required. Please provide a value.[/red]")
+                            continue
+                        else:
+                            break
+                    
                     self.form_data[field.name] = value
                     
                 elif field.field_type == "dropdown":
@@ -411,13 +420,27 @@ class InteractiveForm:
         try:
             # Process each field
             for field in self.fields:
+                # Skip image analysis field if fast mode is selected
+                if field.name == "image_analysis" and self.form_data.get('design_mode') == 'fast':
+                    self.form_data[field.name] = 'disabled'  # Set default for fast mode
+                    continue
+                
                 console.print(f"[bold]{field.label}[/bold]")
                 
                 if field.field_type == "text":
-                    if field.multiline:
-                        value = prompt_with_esc_support(f"{field.placeholder}", "")
-                    else:
-                        value = prompt_with_esc_support(f"{field.placeholder}", "")
+                    while True:
+                        if field.multiline:
+                            value = prompt_with_esc_support(f"{field.placeholder}", "")
+                        else:
+                            value = prompt_with_esc_support(f"{field.placeholder}", "")
+                        
+                        # Check if field is required and validate
+                        if field.required and (not value or not value.strip()):
+                            console.print(f"[red]❌ {field.label} is required. Please provide a value.[/red]")
+                            continue
+                        else:
+                            break
+                    
                     self.form_data[field.name] = value
                     
                 elif field.field_type == "dropdown":
@@ -475,9 +498,10 @@ class InteractiveForm:
                 
                 console.print()
             
-            # Conditionally ask for URLs only if design mode is 'full'
+            # Conditionally ask for URLs only if design mode is 'full' AND image analysis is enabled
             design_mode = self.form_data.get('design_mode', 'full')
-            if design_mode == 'full':
+            image_analysis = self.form_data.get('image_analysis', 'enabled')
+            if design_mode == 'full' and image_analysis == 'enabled':
                 console.print(f"[bold]🔗 Reference URLs (optional, up to 3)[/bold]")
                 urls = []
                 console.print(f"[dim]Enter up to 3 reference URLs for competitor analysis[/dim]")
@@ -505,26 +529,34 @@ class InteractiveForm:
                     console.print(f"[yellow]No URLs added - will use simple generation approach[/yellow]")
                 console.print()
             else:
-                # For fast mode, set empty URLs list
+                # For fast mode or disabled image analysis, set empty URLs list
                 self.form_data['urls'] = []
-                console.print(f"[yellow]⚡ Fast mode selected - skipping reference URL collection[/yellow]")
+                if design_mode == 'fast':
+                    console.print(f"[yellow]⚡ Fast mode selected - skipping reference URL collection[/yellow]")
+                else:
+                    console.print(f"[yellow]⚡ Image analysis disabled - skipping reference URL collection[/yellow]")
                 console.print()
             
             # Show summary and confirm
             console.print("[bold cyan]📋 Project Summary:[/bold cyan]")
             for field in self.fields:
+                # Skip image analysis field in summary if fast mode
+                if field.name == "image_analysis" and design_mode == 'fast':
+                    continue
                 value = self.form_data.get(field.name, "Not set")
                 console.print(f"  {field.label}: [green]{value}[/green]")
             
             # Show URLs summary
             urls = self.form_data.get('urls', [])
-            if design_mode == 'full':
+            if design_mode == 'full' and image_analysis == 'enabled':
                 if urls:
                     console.print(f"  🔗 Reference URLs: [green]{len(urls)} URL(s)[/green]")
                     for i, url in enumerate(urls, 1):
                         console.print(f"    {i}. {url}")
                 else:
                     console.print(f"  🔗 Reference URLs: [yellow]None (simple approach)[/yellow]")
+            elif design_mode == 'full' and image_analysis == 'disabled':
+                console.print(f"  🔗 Reference URLs: [yellow]N/A (image analysis disabled)[/yellow]")
             else:
                 console.print(f"  🔗 Reference URLs: [yellow]N/A (fast mode)[/yellow]")
             
@@ -650,26 +682,32 @@ class CCUXApp:
             ("fast", "Fast Mode - Quick generation without research phases (faster, simpler results)"),
         ]
         
+        image_analysis_options = [
+            ("enabled", "🔍 Enable Visual Analysis (Higher quality, more tokens)"),
+            ("disabled", "⚡ Skip Visual Analysis (Faster, saves tokens)")
+        ]
+        
         fields = [
             FormField("description", "📝 Project Description", "text", 
                      placeholder="Describe your project (e.g., 'AI-powered task manager')", 
                      required=True, multiline=True),
             FormField("design_mode", "🧠 Design Process", "dropdown", "full", design_mode_options),
             FormField("theme", "🎨 Theme", "dropdown", "minimal", theme_options),
+            FormField("image_analysis", "📸 Competitor Screenshot Analysis", "dropdown", "enabled", image_analysis_options),
             FormField("forms", "📝 Contact Forms", "dropdown", "none", form_options),
         ]
         
         form = InteractiveForm("Create New Project", fields)
         return form.show_with_conditional_urls()
     
-    def generate_project(self, desc: str, theme: str, include_forms: bool, output_dir: str, urls: List[str] = None, design_mode: str = "full") -> bool:
+    def generate_project(self, desc: str, theme: str, include_forms: bool, output_dir: str, urls: List[str] = None, design_mode: str = "full", analyze_images: bool = True) -> bool:
         """Generate project using either full design methodology or fast mode"""
         if design_mode == "fast":
             return self.generate_project_fast(desc, theme, include_forms, output_dir, urls)
         else:
-            return self.generate_project_full(desc, theme, include_forms, output_dir, urls)
+            return self.generate_project_full(desc, theme, include_forms, output_dir, urls, analyze_images)
     
-    def generate_project_full(self, desc: str, theme: str, include_forms: bool, output_dir: str, urls: List[str] = None) -> bool:
+    def generate_project_full(self, desc: str, theme: str, include_forms: bool, output_dir: str, urls: List[str] = None, analyze_images: bool = True) -> bool:
         """Generate project using full 12-phase design thinking methodology"""
         try:
             # Import comprehensive design logic
@@ -739,36 +777,42 @@ class CCUXApp:
                 'design_phases': {}
             }
             
-            # Phase 1: Reference Discovery (if URLs not provided, auto-discover)
-            if not urls or len(urls) == 0:
-                console.print("\n[bold blue]📋 Phase 1/12: Reference Discovery[/bold blue]")
-                ref_prompt = reference_discovery_prompt(desc)
-                ref_output, ref_stats = run_claude_with_progress(ref_prompt, "Discovering competitor references...")
-                analysis_data['design_phases']['reference_discovery'] = {
-                    'output': ref_output,
-                    'stats': ref_stats
-                }
-                
-                # Extract URLs from Claude's response (simplified for now)
-                import re
-                discovered_urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', ref_output)
-                urls = discovered_urls[:3] if discovered_urls else []
-                analysis_data['project_metadata']['reference_urls'] = urls
-                
-                if urls:
-                    console.print(f"[green]✓ Discovered {len(urls)} reference URLs[/green]")
+            # Phase 1: Reference Discovery (only if image analysis is enabled)
+            if analyze_images:
+                # Reference Discovery (if URLs not provided, auto-discover)
+                if not urls or len(urls) == 0:
+                    console.print("\n[bold blue]📋 Phase 1/12: Reference Discovery[/bold blue]")
+                    ref_prompt = reference_discovery_prompt(desc)
+                    ref_output, ref_stats = run_claude_with_progress(ref_prompt, "Discovering competitor references...")
+                    analysis_data['design_phases']['reference_discovery'] = {
+                        'output': ref_output,
+                        'stats': ref_stats
+                    }
+                    
+                    # Extract URLs from Claude's response (simplified for now)
+                    import re
+                    discovered_urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', ref_output)
+                    urls = discovered_urls[:3] if discovered_urls else []
+                    analysis_data['project_metadata']['reference_urls'] = urls
+                    
+                    if urls:
+                        console.print(f"[green]✓ Discovered {len(urls)} reference URLs[/green]")
+                        for i, url in enumerate(urls, 1):
+                            console.print(f"   {i}. {url}")
+                    else:
+                        console.print("[yellow]No reference URLs discovered, continuing with original approach[/yellow]")
+                else:
+                    console.print(f"\n[bold blue]📋 Phase 1/12: Using provided reference URLs ({len(urls)})[/bold blue]")
                     for i, url in enumerate(urls, 1):
                         console.print(f"   {i}. {url}")
-                else:
-                    console.print("[yellow]No reference URLs discovered, continuing with original approach[/yellow]")
             else:
-                console.print(f"\n[bold blue]📋 Phase 1/12: Using provided reference URLs ({len(urls)})[/bold blue]")
-                for i, url in enumerate(urls, 1):
-                    console.print(f"   {i}. {url}")
+                console.print("\n[bold blue]📋 Phase 1/12: Skipping Reference Discovery (image analysis disabled)[/bold blue]")
+                urls = []
+                analysis_data['project_metadata']['reference_urls'] = []
             
-            # Phase 2: Screenshot Capture
+            # Phase 2: Screenshot Capture (only if image analysis is enabled)
             screenshot_refs = []
-            if urls and len(urls) > 0:
+            if urls and len(urls) > 0 and analyze_images:
                 console.print(f"\n[bold blue]📸 Phase 2/12: Capturing {len(urls)} reference screenshots[/bold blue]")
                 try:
                     from .scrape import capture_multiple_references
@@ -778,6 +822,8 @@ class CCUXApp:
                 except Exception as e:
                     console.print(f"[yellow]⚠️ Screenshot capture failed: {e}[/yellow]")
                     console.print("[yellow]Continuing without screenshots...[/yellow]")
+            elif not analyze_images:
+                console.print("\n[bold blue]📸 Phase 2/12: Skipping Screenshot Capture (image analysis disabled)[/bold blue]")
             
             # Phase 3: Deep Product Understanding
             console.print("\n[bold blue]🎯 Phase 3/12: Product Analysis[/bold blue]")
@@ -791,17 +837,20 @@ class CCUXApp:
             
             # Phase 4: Competitive UX Analysis
             ux_analysis = {}
-            if screenshot_refs:
-                console.print("\n[bold blue]🔍 Phase 4/12: Competitive UX Analysis[/bold blue]")
+            if screenshot_refs and analyze_images:
+                console.print("\n[bold blue]🔍 Phase 4/12: Competitive UX Analysis (Visual)[/bold blue]")
                 # Extract only the screenshot paths from the tuples
                 screenshot_paths = [screenshot_path for url, screenshot_path in screenshot_refs]
                 ux_prompt = ux_analysis_prompt(desc, screenshot_paths)
-                ux_output, ux_stats = run_claude_with_progress(ux_prompt, "Analyzing competitor UX patterns...")
+                ux_output, ux_stats = run_claude_with_progress(ux_prompt, "Analyzing competitor UX patterns...", enable_image_analysis=True)
                 ux_analysis = safe_json_parse(ux_output)
                 analysis_data['design_phases']['ux_analysis'] = {
                     'output': ux_output,
                     'stats': ux_stats
                 }
+            elif screenshot_refs and not analyze_images:
+                console.print("\n[bold blue]⏭️  Phase 4/12: Competitive UX Analysis (Skipped)[/bold blue]")
+                console.print("   [dim]Screenshots captured but visual analysis disabled to save tokens[/dim]")
             
             # Phase 5: User Empathy Mapping
             console.print("\n[bold blue]👥 Phase 5/12: User Research[/bold blue]")
@@ -1384,8 +1433,16 @@ class CCUXApp:
                     design_mode = form_data.get('design_mode', 'full')
                     theme = form_data.get('theme', 'minimal')
                     forms = form_data.get('forms', 'none')
+                    image_analysis_mode = form_data.get('image_analysis', 'enabled')
                     urls = form_data.get('urls', [])
                     include_forms = forms != 'none'
+                    analyze_images = image_analysis_mode == 'enabled'
+                    
+                    # Additional validation for description
+                    if not desc or not desc.strip():
+                        console.print("[red]❌ Product description is required. Cannot proceed without a description.[/red]")
+                        Prompt.ask("Press Enter to continue", default="")
+                        continue
                     
                     # Get next available output directory
                     from .cli import get_next_available_output_dir
@@ -1395,12 +1452,13 @@ class CCUXApp:
                     console.print(f"[cyan]Design Mode:[/cyan] {'🚀 Full Design Process (12 phases)' if design_mode == 'full' else '⚡ Fast Mode'}")
                     console.print(f"[cyan]Theme:[/cyan] {theme}")
                     console.print(f"[cyan]Forms:[/cyan] {forms}")
+                    console.print(f"[cyan]Image Analysis:[/cyan] {'🔍 Enabled (high quality)' if analyze_images else '⚡ Disabled (saves tokens)'}")
                     console.print(f"[cyan]URLs:[/cyan] {len(urls)} reference URL(s)" if urls else "[yellow]None (simple generation)[/yellow]")
                     console.print(f"[cyan]Output:[/cyan] {output_dir}/")
                     
                     # Call the actual generation logic
                     try:
-                        success = self.generate_project(desc, theme, include_forms, output_dir, urls, design_mode)
+                        success = self.generate_project(desc, theme, include_forms, output_dir, urls, design_mode, analyze_images)
                         if success:
                             console.print(f"\n[green]✅ Project created successfully in {output_dir}/![/green]")
                             
