@@ -2,7 +2,7 @@
 
 > Professional landing pages from your terminal using AI
 
-**🎆 Version 2.2.1 - Enhanced CLI Experience!**
+**🎆 Version 2.2.2 - Enhanced CLI Experience!**
 
 **Open source and completely free**
 
@@ -12,7 +12,7 @@ CCUX is a powerful, modular CLI tool that uses Claude AI to generate conversion-
 
 **✨ Recently Enhanced**: Completely refactored with a modular core system for better maintainability, performance, and extensibility.
 
-## 🆕 What's New in Version 2.2.1
+## 🆕 What's New in Version 2.2.2
 
 ### **Modular Core Architecture**
 - **78% Code Reduction**: Eliminated duplicate code through smart modularization
