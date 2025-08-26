@@ -55,7 +55,6 @@ ccux gen --desc-file product.pdf --theme brutalist
 | `ccux multipage` | Generate complete multi-page website |
 | `ccux regen` | Update specific sections of existing pages |
 | `ccux projects` | List existing projects |
-| `ccux cost` | Show token usage and costs |
 | `ccux help` | Get detailed help for any topic |
 
 ## What You Get
