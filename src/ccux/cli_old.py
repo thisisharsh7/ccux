@@ -3364,6 +3364,75 @@ def display_project_costs(project_cost: dict, detailed: bool):
         console.print(table)
 
 
+def multipage(desc: Optional[str] = None, desc_file: Optional[str] = None, 
+             theme: str = "minimal", base_url: str = "https://example.com", 
+             output_dir: Optional[str] = None):
+    """Generate intelligent multi-page website with parallel processing"""
+    
+    from .multipage import run_multipage_generation
+    from PyPDF2 import PdfReader
+    
+    try:
+        # Get product description
+        if desc_file:
+            desc_path = Path(desc_file)
+            if not desc_path.exists():
+                console.print(f"[red]❌ Description file not found: {desc_file}[/red]")
+                raise typer.Exit(1)
+            
+            if desc_file.lower().endswith('.pdf'):
+                try:
+                    reader = PdfReader(desc_file)
+                    desc = ""
+                    for page in reader.pages:
+                        desc += page.extract_text() + "\n"
+                    desc = desc.strip()
+                except Exception as e:
+                    console.print(f"[red]❌ Error reading PDF: {e}[/red]")
+                    raise typer.Exit(1)
+            else:
+                with open(desc_file, 'r', encoding='utf-8') as f:
+                    desc = f.read().strip()
+        
+        if not desc:
+            desc = Prompt.ask("[cyan]Enter product description for multi-page website[/cyan]")
+        
+        if not desc.strip():
+            console.print("[red]❌ Product description is required[/red]")
+            raise typer.Exit(1)
+        
+        # Validate theme
+        if theme not in get_theme_choices():
+            console.print(f"[red]❌ Invalid theme: {theme}[/red]")
+            console.print(f"[yellow]Available themes: {', '.join(get_theme_choices())}[/yellow]")
+            raise typer.Exit(1)
+        
+        # Show startup banner
+        console.print(f"\n[bold blue]🌐 CCUX Multi-Page Website Generator[/bold blue]")
+        console.print(f"[dim]Theme: {theme} | Base URL: {base_url}[/dim]")
+        
+        # Run multi-page generation (non-interactive mode for CLI)
+        results = run_multipage_generation(desc, output_dir, theme, base_url, interactive=False)
+        
+        # Handle results
+        if results.get('success', False):
+            console.print(f"\n[bold green]🎉 Multi-page website generated successfully![/bold green]")
+        elif results.get('cancelled', False):
+            console.print(f"\n[yellow]⚠️  Generation cancelled by user[/yellow]")
+            raise typer.Exit(1)
+        else:
+            error_msg = results.get('error', 'Unknown error occurred')
+            console.print(f"\n[red]❌ Generation failed: {error_msg}[/red]")
+            raise typer.Exit(1)
+            
+    except KeyboardInterrupt:
+        console.print(f"\n[yellow]⚠️  Operation cancelled by user[/yellow]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Unexpected error: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command()
 def version():
     """Show version information"""

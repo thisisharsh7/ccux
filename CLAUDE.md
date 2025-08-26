@@ -10,6 +10,7 @@ CCUX (Claude Code UI Generator) is a sophisticated Python CLI tool that automati
 - **Interactive Interface** (`src/ccux/interactive.py`): Rich terminal application with project management
 - **Main CLI** (`src/ccux/cli.py`): User-facing CLI with help system and command delegation
 - **Implementation CLI** (`src/ccux/cli_old.py`): Core command implementations and business logic
+- **Multi-Page Generator** (`src/ccux/multipage.py`): Orchestrator for intelligent multi-page website generation
 - **Modular Core System** (`src/ccux/core/`): Organized utility modules by function
   - `usage_tracking.py`: Cost calculation and token analytics
   - `signal_handling.py`: Graceful interrupt handling
@@ -20,6 +21,12 @@ CCUX (Claude Code UI Generator) is a sophisticated Python CLI tool that automati
   - `form_handling.py`: Interactive form generation and management
   - `section_management.py`: Section replacement with semantic ordering
   - `animation_utilities.py`: Theme-appropriate animations
+  - `page_analysis.py`: Intelligent page detection for multi-page websites
+  - `page_selection.py`: Interactive page selection interface with confidence scoring
+  - `parallel_generator.py`: Multi-threaded page generation engine
+  - `navigation_builder.py`: Cross-page navigation system builder
+  - `sitemap_generator.py`: SEO sitemap and robots.txt generation
+  - `retry_handler.py`: Error handling and retry logic for robust generation
 - **Theme System** (`src/ccux/theme_specifications.py`): 13 professional design themes
 - **Prompt Templates** (`src/ccux/prompt_templates.py`): 12-phase design methodology prompts
 - **Web Scraping** (`src/ccux/scrape.py`, `src/ccux/scrape_simple.py`): Competitor analysis automation
@@ -28,7 +35,8 @@ CCUX (Claude Code UI Generator) is a sophisticated Python CLI tool that automati
 
 ### 🎨 Interactive Application
 The main interface launched with `ccux init`:
-- **Project Creation Wizard**: Guided landing page generation with theme/form selection
+- **Single-Page Creation**: Guided landing page generation with theme/form selection
+- **Multi-Page Websites**: Complete website generation with intelligent page analysis
 - **Multi-Project Management**: Discover, select, and manage multiple projects
 - **Visual Section Editing**: Number-based section selection with live feedback  
 - **Theme Switching**: Interactive theme selection with preview
@@ -79,7 +87,8 @@ Launch CCUX Interactive Application (Main Entry Point)
 **Description:** The primary interface providing guided project creation, management, and customization through rich terminal menus.
 
 **Features:**
-- Project creation wizard with theme and form selection  
+- Single-page project creation wizard with theme and form selection
+- **Multi-page website generation** with intelligent page analysis and parallel processing
 - Multi-project management and discovery
 - Visual section regeneration with numbered selection
 - Interactive theme switching with live preview
@@ -159,6 +168,45 @@ ccux regen --section pricing --file custom/page.html
 
 **Note:** Advanced commands like `editgen`, `theme`, and `form` are available through the interactive application launched with `ccux init`. The interactive interface provides guided workflows for these advanced features with rich terminal UI and visual feedback.
 
+### `ccux multipage`
+Generate intelligent multi-page website with parallel processing
+
+**Options:**
+- `--desc, -d TEXT`: Product description for multi-page website
+- `--desc-file FILE`: Path to file containing product description (supports .txt and .pdf files)
+- `--theme, -t THEME`: Design theme (default: minimal)
+- `--base-url, -u URL`: Base URL for sitemap generation (default: https://example.com)
+- `--output, -o DIR`: Output directory
+
+**Key Features:**
+- **Intelligent Analysis**: AI-powered page detection with confidence scoring
+- **Interactive Selection**: Rich terminal interface for page selection
+- **Parallel Generation**: Generate multiple pages simultaneously
+- **Smart Navigation**: Automatic cross-page navigation and linking
+- **SEO Optimization**: XML/HTML sitemaps and robots.txt generation
+- **Error Handling**: Graceful failure recovery with retry options
+
+**Examples:**
+```bash
+# Basic multi-page website
+ccux multipage --desc "SaaS platform for remote teams"
+
+# With custom theme and base URL
+ccux multipage --desc "E-commerce platform" --theme morphism --base-url https://mystore.com
+
+# From PDF description file
+ccux multipage --desc-file product-description.pdf --theme brutalist
+
+# Interactive mode (recommended)
+ccux init
+# Then select "Create Multi-Page Website" from the menu
+```
+
+**Three-Phase Process:**
+1. **Analysis Phase**: AI analyzes description → Suggests pages → Interactive selection
+2. **Generation Phase**: Parallel page generation → Real-time progress → Error handling
+3. **Connection Phase**: Build navigation → Generate sitemaps → SEO optimization
+
 ### `ccux help`
 Comprehensive help system with specialized topics
 
@@ -234,9 +282,19 @@ CCUX implements a comprehensive 12-phase professional design methodology:
 ## Output Structure
 
 ### Generated Files
+
+**Single-Page Projects:**
 - `index.html` or `App.jsx` - Main landing page file
 - `design_analysis.json` - Complete design research and metadata
 - `*.jpg` - Competitor screenshot references (when applicable)
+
+**Multi-Page Projects:**
+- `index.html` - Homepage file
+- `features/index.html`, `pricing/index.html`, etc. - Individual page files
+- `multipage_analysis.json` - Multi-page generation metadata
+- `sitemap.xml` - XML sitemap for search engines
+- `sitemap.html` - Human-readable sitemap
+- `robots.txt` - Search engine crawler instructions
 
 ### HTML Features
 - **Semantic Structure** with proper heading hierarchy and ARIA labels
@@ -318,6 +376,7 @@ src/ccux/
 ├── cli.py                   # User-facing CLI with help system
 ├── cli_old.py               # Implementation CLI with core commands
 ├── interactive.py           # Interactive application interface
+├── multipage.py             # Multi-page website generation orchestrator
 ├── core/                    # Modular utility system
 │   ├── __init__.py
 │   ├── README.md            # Core modules documentation
@@ -329,7 +388,13 @@ src/ccux/
 │   ├── content_processing.py # HTML validation and processing
 │   ├── form_handling.py     # Form generation and management
 │   ├── section_management.py # Section replacement logic
-│   └── animation_utilities.py # Theme-appropriate animations
+│   ├── animation_utilities.py # Theme-appropriate animations
+│   ├── page_analysis.py     # Intelligent page detection for multi-page websites
+│   ├── page_selection.py    # Interactive page selection interface
+│   ├── parallel_generator.py # Multi-threaded page generation engine
+│   ├── navigation_builder.py # Cross-page navigation system builder
+│   ├── sitemap_generator.py # SEO sitemap and robots.txt generation
+│   └── retry_handler.py     # Error handling and retry logic
 ├── prompt_templates.py      # 12-phase design methodology prompts
 ├── theme_specifications.py  # Theme system with 13 professional themes
 ├── scrape.py               # Advanced Playwright web scraping
@@ -344,10 +409,12 @@ The recent reorganization provides significant improvements:
 - **78% Reduction**: Eliminated duplicate code through smart modularization
 - **Organized Core Modules**: Each utility function exists in only one place
 - **Clean Imports**: Clear dependency relationships between modules
+- **Multi-Page Integration**: 6 new specialized modules seamlessly integrated
 
 ### 📖 **Improved Readability**
 - `cli.py`: Clean user interface with comprehensive help system
 - `cli_old.py`: Focused implementation with core business logic
+- `multipage.py`: Dedicated orchestrator for multi-page website generation
 - `core/` modules: Logical organization by function and responsibility
 
 ### 🔧 **Better Maintainability**
@@ -359,8 +426,9 @@ The recent reorganization provides significant improvements:
 ### 🏗️ **Enhanced Development**
 - New features can be added to appropriate modules
 - Import system makes dependencies clear and manageable
-- Core utilities shared between CLI and interactive modes
+- Core utilities shared between CLI, interactive, and multi-page modes
 - Better code reuse across the entire application
+- Parallel processing capabilities for scalable website generation
 
 ## Important Notes
 

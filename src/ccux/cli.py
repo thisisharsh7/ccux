@@ -185,6 +185,18 @@ def regen(
     from . import cli_old
     cli_old.regen(section, all, desc, file, output_dir)
 
+@app.command()
+def multipage(
+    desc: Optional[str] = typer.Option(None, "--desc", "-d", help="Product description for multi-page website"),
+    desc_file: Optional[str] = typer.Option(None, "--desc-file", help="Path to file containing product description"),
+    theme: Optional[str] = typer.Option("minimal", "--theme", "-t", help="Design theme"),
+    base_url: Optional[str] = typer.Option("https://example.com", "--base-url", "-u", help="Base URL for sitemap generation"),
+    output_dir: Optional[str] = typer.Option(None, "--output", "-o", help="Output directory")
+):
+    """Generate intelligent multi-page website with parallel processing"""
+    # Import and use the multipage function from cli_old
+    from . import cli_old
+    cli_old.multipage(desc, desc_file, theme, base_url, output_dir)
 
 # Default command when no arguments provided
 @app.callback(invoke_without_command=True)

@@ -646,6 +646,7 @@ class CCUXApp:
         
         options = [
             MenuOption("create", "Create New Project", "Generate a fresh landing page", "🆕"),
+            MenuOption("multipage", "Create Multi-Page Website", "Generate complete website with multiple pages", "🌐"),
             MenuOption("manage", f"Manage Existing Projects ({project_count} found)", "Edit, regenerate, or change themes", "📁"),
             MenuOption("help", "Help & Documentation", "Learn how to use CCUX effectively", "❓"),
             MenuOption("exit", "Exit", "Close CCUX application", "❌")
@@ -699,6 +700,32 @@ class CCUXApp:
         
         form = InteractiveForm("Create New Project", fields)
         return form.show_with_conditional_urls()
+    
+    def show_multipage_form(self):
+        """Show multi-page website creation form"""
+        from .theme_specifications import get_theme_choices, THEME_SPECIFICATIONS
+        
+        # Create theme options
+        theme_options = []
+        for theme in get_theme_choices():
+            theme_spec = THEME_SPECIFICATIONS.get(theme)
+            if theme_spec:
+                desc = theme_spec.description[:40] + "..." if len(theme_spec.description) > 40 else theme_spec.description
+            else:
+                desc = f'{theme.title()} theme'
+            theme_options.append((theme, desc))
+        
+        fields = [
+            FormField("description", "📝 Product Description", "text", 
+                     placeholder="Describe your product/service for multi-page website generation", 
+                     required=True, multiline=True),
+            FormField("theme", "🎨 Theme", "dropdown", "minimal", theme_options),
+            FormField("base_url", "🌐 Base URL", "text", "https://example.com",
+                     placeholder="Base URL for SEO sitemap (e.g., https://mysite.com)")
+        ]
+        
+        form = InteractiveForm("Create Multi-Page Website", fields)
+        return form.show()
     
     def generate_project(self, desc: str, theme: str, include_forms: bool, output_dir: str, urls: List[str] = None, design_mode: str = "full", analyze_images: bool = True) -> bool:
         """Generate project using either full design methodology or fast mode"""
@@ -1478,6 +1505,49 @@ class CCUXApp:
                     
                     Prompt.ask("Press Enter to continue", default="")
                 
+            elif action == 'multipage':
+                result, form_data = self.show_multipage_form()
+                if result == 'generate':
+                    console.print("\n[green]🚀 Generating your multi-page website...[/green]")
+                    
+                    # Get form data
+                    desc = form_data.get('description', '')
+                    theme = form_data.get('theme', 'minimal')
+                    base_url = form_data.get('base_url', 'https://example.com')
+                    
+                    # Additional validation for description
+                    if not desc or not desc.strip():
+                        console.print("[red]❌ Product description is required. Cannot proceed without a description.[/red]")
+                        Prompt.ask("Press Enter to continue", default="")
+                        continue
+                    
+                    # Get next available output directory
+                    from .core.project_management import get_next_available_output_dir
+                    output_dir = get_next_available_output_dir()
+                    
+                    console.print(f"[cyan]Description:[/cyan] {desc}")
+                    console.print(f"[cyan]Theme:[/cyan] {theme}")
+                    console.print(f"[cyan]Base URL:[/cyan] {base_url}")
+                    console.print(f"[cyan]Output:[/cyan] {output_dir}/")
+                    
+                    # Call the multipage generation logic
+                    try:
+                        from .multipage import run_multipage_generation
+                        results = run_multipage_generation(desc, output_dir, theme, base_url)
+                        
+                        if results.get('success', False):
+                            console.print(f"\n[green]✅ Multi-page website created successfully in {output_dir}/![/green]")
+                            console.print(f"[green]Generated {results.get('pages_generated', 0)} pages with navigation and SEO files![/green]")
+                        else:
+                            console.print("\n[red]❌ Multi-page website generation failed[/red]")
+                            if results.get('error'):
+                                console.print(f"[red]Error: {results['error']}[/red]")
+                            
+                    except Exception as e:
+                        console.print(f"\n[red]❌ Error generating multi-page website: {e}[/red]")
+                    
+                    Prompt.ask("Press Enter to continue", default="")
+                
             elif action == 'manage':
                 if not self.projects:
                     console.print("\n[yellow]No existing projects found.[/yellow]")
@@ -1511,11 +1581,28 @@ class CCUXApp:
                 
             elif action == 'help':
                 console.print("\n[cyan]📚 CCUX Help & Documentation[/cyan]")
-                console.print("\nCCUX generates conversion-optimized landing pages using:")
-                console.print("• 🤖 Claude AI for content and design")
-                console.print("• 🎨 13 professional themes")
-                console.print("• 📱 Mobile-first responsive design")
-                console.print("• ♿ WCAG accessibility compliance")
+                console.print("\n[bold]CCUX Features:[/bold]")
+                console.print("• 🆕 [cyan]Single-Page Generation[/cyan] - Professional landing pages with 12-phase design methodology")
+                console.print("• 🌐 [cyan]Multi-Page Websites[/cyan] - Complete websites with intelligent page detection and parallel generation")
+                console.print("• 🤖 [cyan]AI-Powered Content[/cyan] - Claude AI generates optimized content and design")
+                console.print("• 🎨 [cyan]13 Professional Themes[/cyan] - From minimal to brutalist to morphism")
+                console.print("• 📱 [cyan]Mobile-First Design[/cyan] - Responsive design that works on all devices")
+                console.print("• ♿ [cyan]Accessibility[/cyan] - WCAG compliance and semantic HTML")
+                console.print("• 🔍 [cyan]SEO Optimization[/cyan] - Automatic sitemaps, meta tags, and schema markup")
+                
+                console.print("\n[bold]Multi-Page Features:[/bold]")
+                console.print("• 🧠 Smart page analysis and suggestions")
+                console.print("• ⚡ Parallel generation for faster results")
+                console.print("• 🔗 Automatic navigation and cross-linking")
+                console.print("• 📊 XML/HTML sitemaps and robots.txt")
+                console.print("• 🛡️ Graceful error handling and retry logic")
+                
+                console.print("\n[bold]Getting Started:[/bold]")
+                console.print("1. Choose 'Create New Project' for single landing pages")
+                console.print("2. Choose 'Create Multi-Page Website' for complete websites")
+                console.print("3. Follow the interactive prompts")
+                console.print("4. Your website will be generated with professional quality")
+                
                 console.print("\nFor more info, visit: https://github.com/thisisharsh7/claude-cli-wrapper")
                 Prompt.ask("Press Enter to continue", default="")
                 
