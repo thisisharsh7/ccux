@@ -166,7 +166,7 @@ class ParallelGenerator:
         return self.results
     
     def _generate_single_page(self, task: PageGenerationTask) -> PageGenerationResult:
-        """Generate a single page with error handling"""
+        """Generate a single page with error handling and proper usage tracking"""
         
         task.status = "running"
         task.start_time = time.time()
@@ -176,13 +176,18 @@ class ParallelGenerator:
         self.progress_data['running'] += 1
         
         try:
-            # Generate the page using Claude (disable progress to avoid display conflicts)
+            # Import usage tracking functions
+            from .usage_tracking import get_latest_usage, calculate_usage_difference, calculate_estimated_cost
+            from .configuration import Config
             import subprocess
-            import json
             import os
             
-            # Use claude CLI directly to avoid progress display conflicts
-            claude_cmd = os.environ.get('CCUX_CLAUDE_CMD', 'claude')
+            # Get usage before Claude call for comparison
+            pre_usage = get_latest_usage()
+            
+            # Use claude CLI with proper configuration
+            config = Config()
+            claude_cmd = config.get_claude_command()
             cmd = [claude_cmd, '--print', task.prompt]
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -192,12 +197,21 @@ class ParallelGenerator:
             
             content = result.stdout.strip()
             
-            # Simple usage stats (we can't get detailed stats from direct CLI call)
-            usage_stats = {
-                'input_tokens': len(task.prompt.split()) * 1.3,  # Rough estimation
-                'output_tokens': len(content.split()) * 1.3,
-                'cost': 0.0  # Can't calculate without API stats
-            }
+            # Get usage after Claude call and calculate difference
+            post_usage = get_latest_usage()
+            usage_stats = calculate_usage_difference(pre_usage, post_usage)
+            
+            # If ccusage tracking failed, fall back to estimation
+            if not usage_stats or usage_stats.get('input_tokens', 0) == 0:
+                estimated_input_tokens = max(1, len(task.prompt.split()) * 1.3)  # Rough estimation
+                estimated_output_tokens = max(1, len(content.split()) * 1.3)
+                estimated_cost = calculate_estimated_cost(int(estimated_input_tokens), int(estimated_output_tokens))
+                
+                usage_stats = {
+                    'input_tokens': int(estimated_input_tokens),
+                    'output_tokens': int(estimated_output_tokens),
+                    'cost': estimated_cost
+                }
             
             # Save the generated content
             self._save_page_content(task.output_path, content)

@@ -244,11 +244,17 @@ NAVIGATION PLACEMENT:
 - Add navigation bar in the <header> section or create one if it doesn't exist
 - Add footer navigation in the <footer> section or create one if it doesn't exist
 - Ensure navigation is sticky/fixed if appropriate for the theme
+- Include mobile menu toggle functionality if needed
+
+IMPORTANT - AVOID DUPLICATE JAVASCRIPT:
+- Only add the active state JavaScript at the bottom of the page
+- Do NOT add complex path resolution scripts in the header
+- Keep mobile menu toggle simple and separate from active state logic
 
 ACTIVE STATE REQUIREMENTS:
 - Add JavaScript to detect current page and highlight active navigation item
-- Use URL pathname or page filename to determine active state
-- Apply active styling (like color, underline, or background) to current page
+- Use data-page attributes and pathname to accurately determine active state
+- Apply active styling to current page only
 - Include script that runs on page load to set active states
 
 REQUIRED JAVASCRIPT FOR ACTIVE STATES:
@@ -258,28 +264,36 @@ Add this JavaScript before closing </body> tag:
 document.addEventListener('DOMContentLoaded', function() {{
     // Get current page path
     const currentPath = window.location.pathname;
-    const currentPage = currentPath.split('/').pop() || 'index.html';
     
-    // Find and activate current nav link
-    const navLinks = document.querySelectorAll('a[href*="index.html"]');
-    navLinks.forEach(link => {{
-        const href = link.getAttribute('href');
-        const linkPage = href.split('/').pop();
+    // Set active state based on data-page attributes
+    document.querySelectorAll('.nav-link[data-page]').forEach(link => {{
+        const pageType = link.getAttribute('data-page');
+        let isActive = false;
         
-        if (linkPage === currentPage || 
-           (currentPage === '' && linkPage === 'index.html') ||
-           (currentPath.includes('/features/') && href.includes('features')) ||
-           (currentPath.includes('/contact/') && href.includes('contact')) ||
-           (currentPath.includes('/pricing/') && href.includes('pricing')) ||
-           (currentPath.includes('/about/') && href.includes('about'))) {{
-            
-            link.classList.add('active', 'text-cyan-400');
-            // Add active underline or styling
-            const underline = link.querySelector('span');
-            if (underline) {{
-                underline.classList.remove('scale-x-0');
-                underline.classList.add('scale-x-100');
-            }}
+        // Check if this is the active page
+        if (pageType === 'homepage' || pageType === 'home') {{
+            // Homepage is active ONLY for root-level index.html, NOT subdirectory index.html files
+            const isRootIndex = currentPath === '/' || 
+                               currentPath === '/index.html' ||
+                               (currentPath.endsWith('/index.html') && currentPath.split('/').length <= 3);
+            const isNotSubdirectory = !currentPath.includes('/features/') && 
+                                     !currentPath.includes('/pricing/') && 
+                                     !currentPath.includes('/contact/') && 
+                                     !currentPath.includes('/about/') &&
+                                     !currentPath.includes('/blog/');
+            isActive = isRootIndex && isNotSubdirectory;
+        }} else {{
+            // Other pages: must be exactly in the page directory
+            isActive = new RegExp(`\\/${{pageType}}\\/index\\.html$`).test(currentPath) ||
+                      new RegExp(`\\/${{pageType}}\\/?$`).test(currentPath);
+        }}
+        
+        if (isActive) {{
+            link.classList.add('bg-white/30', 'shadow-xl', 'ring-2', 'ring-yellow-300', 'ring-opacity-60');
+            link.classList.remove('hover:bg-white/20');
+        }} else {{
+            link.classList.remove('bg-white/30', 'shadow-xl', 'ring-2', 'ring-yellow-300', 'ring-opacity-60');
+            link.classList.add('hover:bg-white/20');
         }}
     }});
 }});

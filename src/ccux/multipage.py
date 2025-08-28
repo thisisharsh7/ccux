@@ -26,6 +26,7 @@ from .core.retry_handler import RetryHandler
 from .core.project_management import get_next_available_output_dir
 from .core.claude_integration import summarize_long_description
 from .core.configuration import Config
+from .core.usage_tracking import get_latest_usage, calculate_usage_difference
 
 # Import existing CCUX functionality
 from .prompt_templates import (
@@ -61,6 +62,16 @@ class MultipageGenerator:
         self.selected_pages = []
         self.generation_results = {}
         self.navigation_html = ""  # Store pre-generated navigation
+        
+        # Cost tracking across all phases
+        self.total_usage_stats = {
+            'analysis_cost': 0.0,
+            'navigation_cost': 0.0,
+            'page_generation_cost': 0.0,
+            'total_input_tokens': 0,
+            'total_output_tokens': 0,
+            'total_cost': 0.0
+        }
         
     def generate_multipage_website(self, description: str, output_dir: Optional[str] = None,
                                  theme: str = "minimal", base_url: str = "https://example.com", 
@@ -121,9 +132,20 @@ class MultipageGenerator:
         """Phase 1: Analyze description and get page selection"""
         
         try:
+            # Get usage before analysis
+            pre_analysis_usage = get_latest_usage()
+            
             # Analyze the product description
             self.console.print("[cyan]Analyzing product description...[/cyan]")
             self.analysis_results = self.analyzer.analyze_description(self.product_description)
+            
+            # Track analysis cost
+            post_analysis_usage = get_latest_usage()
+            analysis_usage_stats = calculate_usage_difference(pre_analysis_usage, post_analysis_usage)
+            if analysis_usage_stats:
+                self.total_usage_stats['analysis_cost'] = analysis_usage_stats.get('cost', 0.0)
+                self.total_usage_stats['total_input_tokens'] += analysis_usage_stats.get('input_tokens', 0)
+                self.total_usage_stats['total_output_tokens'] += analysis_usage_stats.get('output_tokens', 0)
             
             # Page selection (interactive or automatic)
             if self.interactive:
@@ -155,6 +177,9 @@ class MultipageGenerator:
         """Phase 2: Generate navigation HTML first"""
         
         try:
+            # Get usage before navigation generation
+            pre_nav_usage = get_latest_usage()
+            
             self.console.print("[cyan]Generating navigation system...[/cyan]")
             
             # Create navigation prompt
@@ -162,10 +187,21 @@ class MultipageGenerator:
             
             # Generate navigation HTML
             from .core.claude_integration import run_claude_with_progress
-            navigation_html, _ = run_claude_with_progress(
+            navigation_html, nav_usage_stats = run_claude_with_progress(
                 nav_prompt, 
                 "Generating navigation HTML..."
             )
+            
+            # Track navigation cost
+            if not nav_usage_stats or nav_usage_stats.get('input_tokens', 0) == 0:
+                # Fallback to usage difference if run_claude_with_progress didn't return stats
+                post_nav_usage = get_latest_usage()
+                nav_usage_stats = calculate_usage_difference(pre_nav_usage, post_nav_usage)
+            
+            if nav_usage_stats:
+                self.total_usage_stats['navigation_cost'] = nav_usage_stats.get('cost', 0.0)
+                self.total_usage_stats['total_input_tokens'] += nav_usage_stats.get('input_tokens', 0)
+                self.total_usage_stats['total_output_tokens'] += nav_usage_stats.get('output_tokens', 0)
             
             # Clean and store navigation
             self.navigation_html = self._clean_navigation_html(navigation_html)
@@ -455,26 +491,37 @@ Return only the complete HTML code."""
         else:
             theme_rules = {}
         
-        # Create page list with proper names and RELATIVE paths for file structure
+        # Create page list with dynamic names from analysis and RELATIVE paths for file structure
         page_items = []
+        
+        # Create a map of page types to their analysis data for quick lookup
+        page_analysis_map = {}
+        if 'suggested_pages' in self.analysis_results:
+            for page_data in self.analysis_results['suggested_pages']:
+                page_analysis_map[page_data['type']] = page_data
+        
         for page_type in self.selected_pages:
+            # Get dynamic navigation name from analysis results
+            page_analysis = page_analysis_map.get(page_type, {})
+            nav_name = page_analysis.get('nav_name', self._get_default_nav_name(page_type))
+            
             if page_type == 'homepage':
                 page_items.append({
-                    'name': 'Home', 
+                    'name': nav_name, 
                     'href_from_root': '../index.html',  # From subfolder to root
                     'href_from_subfolder': '../index.html',
                     'page_type': 'homepage'
                 })
             elif page_type == 'case-studies':
                 page_items.append({
-                    'name': 'Case Studies', 
+                    'name': nav_name, 
                     'href_from_root': 'case-studies/index.html',  # From root to subfolder
                     'href_from_subfolder': '../case-studies/index.html',  # From subfolder to subfolder
                     'page_type': 'case-studies'
                 })
             else:
                 page_items.append({
-                    'name': page_type.replace('-', ' ').title(),
+                    'name': nav_name,
                     'href_from_root': f'{page_type}/index.html',  # From root to subfolder
                     'href_from_subfolder': f'../{page_type}/index.html',  # From subfolder to subfolder
                     'page_type': page_type
@@ -502,6 +549,7 @@ Navigation Requirements:
 8. Use JavaScript to dynamically set correct paths based on current location
 9. Add active state styling for current page
 10. Include site logo/name as specified
+11. CRITICAL: Add data-page attribute to ALL navigation links consistently
 
 Pages to include in navigation:
 {json.dumps(page_items, indent=2)}
@@ -512,15 +560,21 @@ IMPORTANT PATH HANDLING:
 - For other pages: use href="{{PAGE_PATH_[PAGE_TYPE]}}" (e.g., href="{{PAGE_PATH_FEATURES}}")
 - These placeholders will be replaced with correct relative paths
 
+CRITICAL DATA-PAGE ATTRIBUTES:
+- Add data-page attribute to EVERY navigation link (both desktop and mobile)
+- Use the page_type from the JSON data for data-page values
+- Example: data-page="homepage" for home, data-page="features" for features, etc.
+- This is REQUIRED for proper active state detection
+
 Pages and their placeholder patterns:
-- Home: href="{{HOME_PATH}}"
-- Features: href="{{PAGE_PATH_FEATURES}}"
-- Pricing: href="{{PAGE_PATH_PRICING}}"
-- About: href="{{PAGE_PATH_ABOUT}}"
-- Contact: href="{{PAGE_PATH_CONTACT}}"
-- Blog: href="{{PAGE_PATH_BLOG}}"
-- Case Studies: href="{{PAGE_PATH_CASE_STUDIES}}"
-- Integrations: href="{{PAGE_PATH_INTEGRATIONS}}"
+- Home: href="{{HOME_PATH}}" data-page="homepage" 
+- Features: href="{{PAGE_PATH_FEATURES}}" data-page="features"
+- Pricing: href="{{PAGE_PATH_PRICING}}" data-page="pricing"
+- About: href="{{PAGE_PATH_ABOUT}}" data-page="about"
+- Contact: href="{{PAGE_PATH_CONTACT}}" data-page="contact"
+- Blog: href="{{PAGE_PATH_BLOG}}" data-page="blog"
+- Case Studies: href="{{PAGE_PATH_CASE_STUDIES}}" data-page="case-studies"
+- Integrations: href="{{PAGE_PATH_INTEGRATIONS}}" data-page="integrations"
 
 Return ONLY the navigation HTML component with placeholder hrefs.
 
@@ -566,6 +620,9 @@ Example structure (adapt to your theme):
         # Post-process: Convert absolute paths to placeholders if Claude didn't follow instructions
         nav_html = self._convert_absolute_paths_to_placeholders(nav_html)
         
+        # Validate and fix data-page attributes
+        nav_html = self._ensure_consistent_data_page_attributes(nav_html)
+        
         return nav_html
     
     def _convert_absolute_paths_to_placeholders(self, nav_html: str) -> str:
@@ -586,6 +643,39 @@ Example structure (adapt to your theme):
         # Apply conversions
         for absolute_path, placeholder in path_conversions:
             nav_html = re.sub(absolute_path, placeholder, nav_html, flags=re.IGNORECASE)
+        
+        return nav_html
+    
+    def _ensure_consistent_data_page_attributes(self, nav_html: str) -> str:
+        """Ensure all navigation links have consistent data-page attributes"""
+        
+        # Define mapping of href patterns to data-page values
+        page_mappings = {
+            r'href=[\'"]\{\{HOME_PATH\}\}[\'"]': 'data-page="homepage"',
+            r'href=[\'"]\{\{PAGE_PATH_FEATURES\}\}[\'"]': 'data-page="features"',
+            r'href=[\'"]\{\{PAGE_PATH_PRICING\}\}[\'"]': 'data-page="pricing"',
+            r'href=[\'"]\{\{PAGE_PATH_ABOUT\}\}[\'"]': 'data-page="about"',
+            r'href=[\'"]\{\{PAGE_PATH_CONTACT\}\}[\'"]': 'data-page="contact"',
+            r'href=[\'"]\{\{PAGE_PATH_BLOG\}\}[\'"]': 'data-page="blog"',
+            r'href=[\'"]\{\{PAGE_PATH_CASE_STUDIES\}\}[\'"]': 'data-page="case-studies"',
+            r'href=[\'"]\{\{PAGE_PATH_INTEGRATIONS\}\}[\'"]': 'data-page="integrations"'
+        }
+        
+        # Add missing data-page attributes
+        for href_pattern, data_page in page_mappings.items():
+            # Find all matching anchor tags
+            import re
+            pattern = r'(<a[^>]*' + href_pattern + r'[^>]*)((?!data-page)[^>]*)>'
+            def add_data_page(match):
+                opening_tag = match.group(1)
+                rest_of_tag = match.group(2)
+                # Check if data-page already exists
+                if 'data-page=' in opening_tag + rest_of_tag:
+                    return match.group(0)  # Already has data-page
+                else:
+                    return f'{opening_tag} {data_page}{rest_of_tag}>'
+            
+            nav_html = re.sub(pattern, add_data_page, nav_html, flags=re.IGNORECASE)
         
         return nav_html
     
@@ -893,23 +983,25 @@ Return only the HTML code starting from main content."""
     
     {page_content}
     
-    <!-- Add active state script for navigation -->
-    <script>
-        // Mark current page as active in navigation
-        const currentPath = window.location.pathname;
-        const navLinks = document.querySelectorAll('nav a[href]');
-        navLinks.forEach(link => {{
-            const href = link.getAttribute('href');
-            if ((currentPath === '/' && href === '/') || 
-                (currentPath !== '/' && href !== '/' && currentPath.includes(href))) {{
-                link.classList.add('active', 'text-blue-600', 'font-semibold');
-            }}
-        }});
-    </script>
+    <!-- Active state navigation script (handled by navigation builder) -->
 </body>
 </html>"""
         
         return full_html
+    
+    def _get_default_nav_name(self, page_type: str) -> str:
+        """Get default navigation name for a page type"""
+        default_names = {
+            'homepage': 'Home',
+            'features': 'Features',
+            'pricing': 'Pricing',
+            'about': 'About',
+            'contact': 'Contact',
+            'blog': 'Blog',
+            'case-studies': 'Case Studies',
+            'integrations': 'Integrations'
+        }
+        return default_names.get(page_type, page_type.replace('-', ' ').title())
     
     def _save_generation_metadata(self, successful_pages: List[str], 
                                 injection_results: Dict, sitemap_results: Dict) -> None:
@@ -943,6 +1035,19 @@ Return only the HTML code starting from main content."""
         
         generation_summary = self.generator.get_generation_summary()
         
+        # Aggregate costs from all phases
+        page_gen_stats = generation_summary.get('usage_stats', {})
+        self.total_usage_stats['page_generation_cost'] = page_gen_stats.get('cost', 0.0)
+        self.total_usage_stats['total_input_tokens'] += page_gen_stats.get('input_tokens', 0)
+        self.total_usage_stats['total_output_tokens'] += page_gen_stats.get('output_tokens', 0)
+        
+        # Calculate total cost
+        self.total_usage_stats['total_cost'] = (
+            self.total_usage_stats['analysis_cost'] + 
+            self.total_usage_stats['navigation_cost'] + 
+            self.total_usage_stats['page_generation_cost']
+        )
+        
         return {
             'success': len(successful_pages) > 0,
             'total_pages_requested': len(self.selected_pages),
@@ -955,7 +1060,16 @@ Return only the HTML code starting from main content."""
             'theme': self.theme,
             'base_url': self.base_url,
             'generation_time': generation_summary.get('total_time', 0),
-            'usage_stats': generation_summary.get('usage_stats', {}),
+            'usage_stats': {
+                'input_tokens': self.total_usage_stats['total_input_tokens'],
+                'output_tokens': self.total_usage_stats['total_output_tokens'],
+                'cost': self.total_usage_stats['total_cost'],
+                'breakdown': {
+                    'analysis_cost': self.total_usage_stats['analysis_cost'],
+                    'navigation_cost': self.total_usage_stats['navigation_cost'],
+                    'page_generation_cost': self.total_usage_stats['page_generation_cost']
+                }
+            },
             'files_created': self._get_created_files()
         }
     

@@ -114,10 +114,10 @@ class PageAnalyzer:
         
         return suggested
     
-    def _ai_analysis(self, description: str) -> Dict[str, float]:
-        """Use AI to analyze and suggest pages"""
+    def _ai_analysis(self, description: str) -> Dict[str, Any]:
+        """Use AI to analyze and suggest pages with dynamic navigation names"""
         
-        prompt = f"""Analyze this product description and suggest which website pages would be most valuable.
+        prompt = f"""Analyze this product description and suggest which website pages would be most valuable, including product-specific navigation names.
 
 Product Description:
 {description}
@@ -132,19 +132,55 @@ Available page types:
 - case-studies: Customer success stories
 - integrations: API and integrations
 
-For each page type, rate from 0.0 to 1.0 how valuable it would be based on the product description.
-Consider what information users would need and what the product description suggests.
+For each page type:
+1. Rate from 0.0 to 1.0 how valuable it would be
+2. Suggest a product-specific navigation name (if applicable)
+3. Provide a brief reason for the score
+
+Consider the product type, target audience, and what users would need.
 
 Respond in JSON format:
 {{
-    "homepage": 1.0,
-    "features": 0.8,
-    "pricing": 0.6,
-    "about": 0.3,
-    "contact": 0.7,
-    "blog": 0.2,
-    "case-studies": 0.4,
-    "integrations": 0.9
+    "homepage": {{
+        "score": 1.0,
+        "nav_name": "Home",
+        "reason": "Essential landing page"
+    }},
+    "features": {{
+        "score": 0.8,
+        "nav_name": "Capabilities",
+        "reason": "Users need to understand product functionality"
+    }},
+    "pricing": {{
+        "score": 0.6,
+        "nav_name": "Plans & Pricing",
+        "reason": "Important for conversion decisions"
+    }},
+    "about": {{
+        "score": 0.3,
+        "nav_name": "About Us",
+        "reason": "Good for trust building but not critical"
+    }},
+    "contact": {{
+        "score": 0.7,
+        "nav_name": "Get Support",
+        "reason": "Users need support access"
+    }},
+    "blog": {{
+        "score": 0.2,
+        "nav_name": "Resources",
+        "reason": "Content marketing not essential for MVP"
+    }},
+    "case-studies": {{
+        "score": 0.4,
+        "nav_name": "Success Stories",
+        "reason": "Social proof valuable but secondary"
+    }},
+    "integrations": {{
+        "score": 0.9,
+        "nav_name": "Integrations",
+        "reason": "Critical for API-based products"
+    }}
 }}"""
         
         try:
@@ -181,8 +217,8 @@ Respond in JSON format:
             self.console.print(f"[yellow]⚠️  AI analysis failed: {e}. Using keyword analysis only.[/yellow]")
             return {}
     
-    def _merge_suggestions(self, keyword_suggestions: List[Dict], ai_suggestions: Dict[str, float]) -> List[Dict[str, Any]]:
-        """Merge keyword and AI suggestions"""
+    def _merge_suggestions(self, keyword_suggestions: List[Dict], ai_suggestions: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Merge keyword and AI suggestions with dynamic navigation names"""
         final_suggestions = []
         
         # Create a mapping of existing suggestions
@@ -191,7 +227,17 @@ Respond in JSON format:
         # Process all page types
         for page_type, config in self.page_types.items():
             keyword_suggestion = keyword_map.get(page_type)
-            ai_score = ai_suggestions.get(page_type, 0.0)
+            ai_data = ai_suggestions.get(page_type, {})
+            
+            # Handle both old format (float) and new format (dict)
+            if isinstance(ai_data, dict):
+                ai_score = ai_data.get('score', 0.0)
+                ai_nav_name = ai_data.get('nav_name', config.get('description', page_type.title()))
+                ai_reason = ai_data.get('reason', 'AI suggested')
+            else:
+                ai_score = ai_data if isinstance(ai_data, (int, float)) else 0.0
+                ai_nav_name = config.get('description', page_type.replace('-', ' ').title())
+                ai_reason = f'AI score: {ai_score:.1f}'
             
             if keyword_suggestion:
                 # Combine keyword and AI confidence
@@ -199,8 +245,9 @@ Respond in JSON format:
                 final_suggestions.append({
                     'type': page_type,
                     'confidence': combined_confidence,
-                    'reason': f"{keyword_suggestion['reason']} + AI score: {ai_score:.1f}",
+                    'reason': f"{keyword_suggestion['reason']} + {ai_reason}",
                     'config': config,
+                    'nav_name': ai_nav_name,  # Use AI-suggested navigation name
                     'selected': combined_confidence >= 0.5
                 })
             elif ai_score >= 0.5:
@@ -208,8 +255,9 @@ Respond in JSON format:
                 final_suggestions.append({
                     'type': page_type,
                     'confidence': ai_score,
-                    'reason': f'AI recommendation: {ai_score:.1f}',
+                    'reason': ai_reason,
                     'config': config,
+                    'nav_name': ai_nav_name,  # Use AI-suggested navigation name
                     'selected': True
                 })
         
