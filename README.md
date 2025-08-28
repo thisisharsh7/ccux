@@ -9,7 +9,7 @@ CCUX uses **Claude AI** to transform a simple product description into productio
 - **Professional themes** — choose from 13 styles (minimal, corporate, brutalist, animated, etc.)  
 - **Precision editing** — regenerate specific sections without rebuilding everything  
 - **Interactive workflow** — guided wizard for multi-page sites, live editing, and theme switching  
-- **Production-ready output** — responsive HTML or React components with TailwindCSS, SEO, and accessibility  
+- **Production-ready output** — responsive HTML with TailwindCSS, SEO, and accessibility  
 
 ---
 
@@ -88,7 +88,6 @@ Generate conversion-optimized landing page using AI design methodology
 - `--desc, -d TEXT`: Product description
 - `--desc-file FILE`: Path to file containing product description (supports .txt and .pdf files)
 - `--url, -u URL`: Reference URLs (max 3, can be used multiple times)
-- `--framework, -f [html|react]`: Output framework (default: html)
 - `--theme, -t THEME`: Design theme (default: minimal)
 - `--no-design-thinking`: Skip full design process for faster generation
 - `--include-forms`: Include contact forms in the landing page
@@ -115,8 +114,8 @@ ccux gen --desc-file product-description.pdf --theme minimal
 # Save tokens by disabling image analysis
 ccux gen --desc "SaaS platform" --no-analyze-images
 
-# React output with forms
-ccux gen --desc "Landing page" --framework react --include-forms
+# With forms included
+ccux gen --desc "Landing page" --include-forms
 ```
 
 ### `ccux multipage`
@@ -223,8 +222,8 @@ ccux version
 ## What You Get
 
 ### Professional Quality Output
-- Production-ready HTML or React components  
-- Mobile-responsive design with TailwindCSS  
+- Production-ready HTML with TailwindCSS  
+- Mobile-responsive design  
 - SEO optimization and accessibility features  
 - Clean, semantic code structure  
 
@@ -234,8 +233,28 @@ ccux version
 - Conversion-optimized copywriting  
 - Consistent visual design across 13 themes  
 
-### 13 Design Themes
-From minimal and corporate to brutalist, animated, and illustrated styles.  
+### 13 Professional Design Themes
+
+**Core Themes:**
+- **`minimal`** - Clean, content-focused design inspired by Dieter Rams principles
+- **`brutalist`** - Raw, honest design with bold typography and stark contrasts
+- **`playful`** - Joyful, approachable design with organic shapes and vibrant colors
+- **`corporate`** - Traditional, trustworthy business design for professional services
+
+**Modern Themes:**
+- **`morphism`** - Soft, tactile design combining neumorphism and glassmorphism effects
+- **`animated`** - Motion-first design where smooth animations drive the user experience
+- **`terminal`** - Monospace, CLI-inspired aesthetic perfect for developer tools
+- **`aesthetic`** - Retro-futuristic Y2K and vaporwave styling with gradient overlays
+
+**Specialized Themes:**
+- **`dark`** - Modern dark theme optimized for reduced eye strain and night viewing
+- **`vibrant`** - Colorful, dopamine-rich design that energizes and engages users
+- **`sustainable`** - Nature-inspired design with earth tones for eco-conscious brands
+- **`data`** - Information-dense design optimized for dashboards and analytics platforms
+- **`illustrated`** - Hand-drawn, custom illustration-driven design with artistic flair
+
+Each theme includes carefully crafted color palettes, typography systems, spacing scales, and component styles that work seamlessly across all generated pages.  
 
 ---
 
