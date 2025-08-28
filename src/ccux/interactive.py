@@ -20,6 +20,7 @@ from rich.prompt import Prompt, Confirm, IntPrompt
 
 # Import utilities from core modules
 from .core.content_processing import safe_json_parse
+from .core.signal_handling import register_signal_handler
 
 console = Console()
 
@@ -1617,6 +1618,9 @@ class CCUXApp:
 
 def run_interactive_app():
     """Entry point for interactive application"""
+    # Register signal handler for cancellation support
+    register_signal_handler()
+    
     try:
         app = CCUXApp()
         app.run()

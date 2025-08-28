@@ -73,7 +73,13 @@ from .core.usage_tracking import (
     calculate_usage_difference,
     display_usage_stats
 )
-from .core.signal_handling import register_signal_handler
+from .core.signal_handling import (
+    register_signal_handler,
+    set_current_subprocess,
+    set_current_progress,
+    clear_current_subprocess,
+    clear_current_progress
+)
 from .core.configuration import Config  
 from .core.project_management import (
     get_next_available_output_dir,
@@ -126,34 +132,7 @@ def calculate_usage_difference(pre_usage: Dict[str, Any], post_usage: Dict[str, 
         'cost': max(0.0, cost_diff)
     }
 
-# Global variables for signal handling
-current_subprocess = None
-current_progress = None
-
-def signal_handler(signum, frame):
-    """Handle keyboard interrupts gracefully"""
-    global current_subprocess, current_progress
-    
-    console.print("\n[yellow]⚠️  Interrupt received, cleaning up...[/yellow]")
-    
-    if current_subprocess:
-        try:
-            current_subprocess.terminate()
-            current_subprocess.wait(timeout=5)
-        except:
-            try:
-                current_subprocess.kill()
-            except:
-                pass
-    
-    if current_progress:
-        current_progress.stop()
-    
-    console.print("[red]❌ Operation cancelled by user[/red]")
-    sys.exit(1)
-
-# Register signal handler
-signal.signal(signal.SIGINT, signal_handler)
+# Remove duplicate signal handler - using core module instead
 
 class Config:
     """Configuration management for CCUX"""
@@ -351,7 +330,6 @@ def select_theme_interactively() -> str:
 
 def run_claude_with_progress(prompt: str, description: str = "Claude Code is thinking...") -> tuple[str, Dict[str, Any]]:
     """Run Claude CLI with real-time progress indication and usage tracking via ccusage"""
-    global current_subprocess, current_progress
     
     config = Config()
     claude_cmd = config.get('claude_cmd', 'claude')
@@ -381,12 +359,12 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
         console=console,
         transient=False
     ) as progress:
-        current_progress = progress
+        set_current_progress(progress)
         task = progress.add_task("Processing", total=None)
         
         try:
             # Start Claude process
-            current_subprocess = subprocess.Popen(
+            subprocess_obj = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -394,15 +372,16 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
                 bufsize=1,
                 universal_newlines=True
             )
+            set_current_subprocess(subprocess_obj)
             
             # Start threads to read stdout and stderr
             stdout_thread = threading.Thread(
                 target=read_stream, 
-                args=(current_subprocess.stdout, output_lines)
+                args=(subprocess_obj.stdout, output_lines)
             )
             stderr_thread = threading.Thread(
                 target=read_stream, 
-                args=(current_subprocess.stderr, stderr_lines)
+                args=(subprocess_obj.stderr, stderr_lines)
             )
             
             stdout_thread.start()
@@ -410,28 +389,28 @@ def run_claude_with_progress(prompt: str, description: str = "Claude Code is thi
             
             # Wait for process with timeout (5 minutes)
             try:
-                current_subprocess.wait(timeout=300)
+                subprocess_obj.wait(timeout=300)
             except subprocess.TimeoutExpired:
-                current_subprocess.kill()
+                subprocess_obj.kill()
                 raise Exception("Claude Code timed out after 5 minutes")
             
             # Wait for threads to finish
             stdout_thread.join(timeout=2)
             stderr_thread.join(timeout=2)
             
-            if current_subprocess.returncode != 0:
+            if subprocess_obj.returncode != 0:
                 error_msg = '\n'.join(stderr_lines) if stderr_lines else "Claude Code execution failed"
                 raise Exception(f"Claude Code failed: {error_msg}")
             
             
         except Exception as e:
-            current_progress = None
-            current_subprocess = None
+            clear_current_progress()
+            clear_current_subprocess()
             raise e
         
         finally:
-            current_progress = None
-            current_subprocess = None
+            clear_current_progress()
+            clear_current_subprocess()
     
     # Combine output
     full_output = '\n'.join(output_lines)
