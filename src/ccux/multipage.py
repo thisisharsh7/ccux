@@ -151,10 +151,10 @@ class MultipageGenerator:
             if self.interactive:
                 self.selected_pages = self.selector.interactive_selection(self.analysis_results)
             else:
-                # Auto-select pages with confidence >= 50%
+                # Auto-select pages with confidence >= 70%
                 self.selected_pages = [
                     page['type'] for page in self.analysis_results['suggested_pages'] 
-                    if page.get('selected', False) or page['confidence'] >= 0.5
+                    if page.get('selected', False) or page['confidence'] >= 0.7
                 ]
                 self.console.print(f"[yellow]📄 Auto-selected {len(self.selected_pages)} pages: {', '.join(self.selected_pages)}[/yellow]")
             

@@ -111,8 +111,10 @@ class ParallelGenerator:
                 futures[future] = task
                 task.status = "queued"
             
+            # Show loading message once
+            self._show_loading_message()
+            
             # Process completed tasks
-            last_update = time.time()
             while futures:
                 completed_futures = []
                 
@@ -149,12 +151,6 @@ class ParallelGenerator:
                         self.progress_data['running'] = max(0, self.progress_data['running'] - 1)
                         
                         self.console.print(f"[red]❌ {task.page_type.replace('-', ' ').title()} failed: {str(e)[:50]}[/red]")
-                
-                # Show progress update every 3 seconds
-                current_time = time.time()
-                if current_time - last_update > 3.0:
-                    self._show_progress_update()
-                    last_update = current_time
                 
                 # Small delay to prevent excessive CPU usage
                 if futures:
@@ -247,16 +243,10 @@ class ParallelGenerator:
         self.console.print(f"[dim]Pages: {page_list}[/dim]")
         self.console.print()
     
-    def _show_progress_update(self) -> None:
-        """Show periodic progress updates"""
+    def _show_loading_message(self) -> None:
+        """Show static loading message"""
         total = self.progress_data['total_pages']
-        completed = self.progress_data['completed']
-        failed = self.progress_data['failed']
-        running = self.progress_data['running']
-        
-        progress_percentage = int((completed + failed) / total * 100) if total > 0 else 0
-        
-        self.console.print(f"[cyan]📊 Progress: {completed + failed}/{total} pages ({progress_percentage}%) | Running: {running} | Completed: {completed} | Failed: {failed}[/cyan]")
+        self.console.print(f"[cyan]🔄 Generating {total} pages in parallel... (individual completion messages will appear below)[/cyan]")
     
     def _show_final_summary(self) -> None:
         """Show final generation summary"""
