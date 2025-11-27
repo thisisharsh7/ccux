@@ -297,3 +297,9 @@ python -m http.server 3000
 
 Created by [Harsh Kumar](https://github.com/thisisharsh7)
 
+CCUX is a landing page generator works in your teminal with your claude code. Open-source and free to use.
+
+⭐ **Star** this repo if you find it useful  
+💖 **Sponsor me** → [GitHub Sponsors](https://github.com/sponsors/thisisharsh7?preview=true)
+
+
