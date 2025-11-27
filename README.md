@@ -1,3 +1,5 @@
+A demo video - https://youtu.be/WHDb0yGHOq0?si=E4F-VU2HVmf9kSpg
+
 # CCUX — AI-Powered Website Generator
 CCUX uses **Claude AI** to transform a simple product description into production-ready code — no design tools required.
 
@@ -300,6 +302,6 @@ Created by [Harsh Kumar](https://github.com/thisisharsh7)
 CCUX is a landing page generator works in your teminal with your claude code. Open-source and free to use.
 
 ⭐ **Star** this repo if you find it useful  
-💖 **Sponsor me** → [GitHub Sponsors](https://github.com/sponsors/thisisharsh7?preview=true)
+💖 **Sponsor me** → [GitHub Sponsors](https://github.com/sponsors/thisisharsh7)
 
 
